@@ -220,7 +220,7 @@ int main() {
     }
 
     // Carrega a matriz de um arquivo de texto
-    loadMatrixFromFile(graph, "C:\\Users\\Hélder Pinto\\Desktop\\Fase2_EDA-master\\Fase2_EDA-master\\Fase2_EDA\\matrix.txt", 5, matrix); // Assume que a matriz tem tamanho 5x5
+    loadMatrixFromFile(graph, "matrix.txt", 5, matrix); // Assume que a matriz tem tamanho 5x5
 
     // Imprime o grafo (lista de adjacências)
     printGraph(graph, 5, matrix);
