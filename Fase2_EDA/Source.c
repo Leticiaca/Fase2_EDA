@@ -19,6 +19,13 @@ typedef struct Graph {
     Node** adjLists; // Lista de adjacências
 } Graph;
 
+//Estrutura para acompanhar a soma maior e o caminho correspondente 
+typedef struct {
+    int maxSum;
+    int* bestPath;
+    int bestPathSize;
+}PathInfo;
+
 // Cria um novo nó
 Node* createNode(int v) {
     Node* newNode = (Node*)malloc(sizeof(Node));
@@ -27,12 +34,7 @@ Node* createNode(int v) {
     return newNode;
 }
 
-//Estrutura para acompanhar a soma maior e o caminho correspondente 
-typedef struct {
-    int maxSum;
-    int* bestPath;
-    int bestPathSize;
-};
+
 
 // Cria um novo grafo
 Graph* createGraph(int numVertices) {
@@ -114,49 +116,67 @@ void freeGraph(Graph* graph) {
 }
 
 // Busca em Profundidade
-void DFS(Graph* graph, int v, bool* visited, int* path, int pathIndex, const int matrix[MAX_SIZE][MAX_SIZE], int size, PathInfo* pathInfo) {
+void DFS(Graph* graph, int v, bool* visited, int* path, int pathIndex, int currentSum, const int matrix[MAX_SIZE][MAX_SIZE], int size, PathInfo* pathInfo) {
     visited[v] = true;
     path[pathIndex] = v;
+    currentSum += matrix[v / size][v % size];  // Corrige o acesso aos índices da matriz
 
-    int sum = 0;
-    for (int i = 0; i <= pathIndex; i++) {
-        int row = path[i] / size;
-        int col = path[i] % size;
-        sum += matrix[row][col];
-    }
-
-    if (sum > pathInfo->maxSum) {
-        pathInfo->maxSum = sum;
+    if (currentSum > pathInfo->maxSum) {
+        pathInfo->maxSum = currentSum;
         memcpy(pathInfo->bestPath, path, (pathIndex + 1) * sizeof(int));
         pathInfo->bestPathSize = pathIndex + 1;
     }
 
-
     Node* temp = graph->adjLists[v];
-    while (temp) {
+    while (temp != NULL) {  // Certifique-se de que a condição de parada está correta
         int adjVertex = temp->vertex;
         if (!visited[adjVertex]) {
-            DFS(graph, adjVertex, visited, path, pathIndex + 1, matrix, size);
+            DFS(graph, adjVertex, visited, path, pathIndex + 1, currentSum, matrix, size, pathInfo);
         }
         temp = temp->next;
     }
 
-    visited[v] = false;
+    visited[v] = false;  // Assegura que o estado de visitado é revertido ao voltar
 }
 
-// Função para encontrar todos os caminhos possíveis no grafo
-void findAllPaths(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
-    bool* visited = (bool*)calloc(graph->numVertices, sizeof(bool));
-    int* path = (int*)malloc(graph->numVertices * sizeof(int));
-    if (!visited || !path) {
-        fprintf(stderr, "Erro ao alocar memória para busca.\n");
-        exit(EXIT_FAILURE);
+
+
+void findMaxPath(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    bool* visited = calloc(graph->numVertices, sizeof(bool));
+    int* path = malloc(graph->numVertices * sizeof(int));
+    PathInfo pathInfo = { 0, malloc(graph->numVertices * sizeof(int)), 0 };
+
+    for (int i = 0; i < graph->numVertices; i++) {
+        DFS(graph, i, visited, path, 0, 0, matrix, size, &pathInfo);
     }
 
-    DFS(graph, 0, visited, path, 0, matrix, size);
+    printf("Caminho com a maior soma é: ");
+    for (int i = 0; i < pathInfo.bestPathSize; i++) {
+        printf("%d ", pathInfo.bestPath[i]);
+        if (i < pathInfo.bestPathSize - 1) printf("-> ");
+    }
+    printf("\nMaior soma dos valores: %d\n", pathInfo.maxSum);
 
     free(visited);
     free(path);
+    free(pathInfo.bestPath);
+}
+
+
+// Função para encontrar todos os caminhos possíveis no grafo
+void findAllPaths(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    bool* visited = calloc(graph->numVertices, sizeof(bool));
+    int* path = malloc(graph->numVertices * sizeof(int));
+    PathInfo pathInfo = { 0, malloc(graph->numVertices * sizeof(int)), 0 };
+
+    for (int i = 0; i < graph->numVertices; i++) {
+        DFS(graph, i, visited, path, 0, 0, matrix, size, &pathInfo);  // Inclui argumento para soma atual e PathInfo
+    }
+
+    // Opcional: Mostrar resultados ou limpeza adicional
+    free(visited);
+    free(path);
+    free(pathInfo.bestPath);
 }
 
 //Função para encontrar o caminho com a maior soma 
