@@ -27,6 +27,13 @@ Node* createNode(int v) {
     return newNode;
 }
 
+//Estrutura para acompanhar a soma maior e o caminho correspondente 
+typedef struct {
+    int maxSum;
+    int* bestPath;
+    int bestPathSize;
+};
+
 // Cria um novo grafo
 Graph* createGraph(int numVertices) {
     Graph* graph = (Graph*)malloc(sizeof(Graph));
@@ -107,24 +114,23 @@ void freeGraph(Graph* graph) {
 }
 
 // Busca em Profundidade
-void DFS(Graph* graph, int v, bool* visited, int* path, int pathIndex, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+void DFS(Graph* graph, int v, bool* visited, int* path, int pathIndex, const int matrix[MAX_SIZE][MAX_SIZE], int size, PathInfo* pathInfo) {
     visited[v] = true;
     path[pathIndex] = v;
 
-    if (v == graph->numVertices - 1) {
-        int sum = 0;
-        printf("Caminho encontrado: ");
-        for (int i = 0; i <= pathIndex; i++) {
-            int row = path[i] / size;
-            int col = path[i] % size;
-            sum += matrix[row][col];
-            printf("%d ", path[i]);
-            if (i < pathIndex) {
-                printf("-> ");
-            }
-        }
-        printf("\nSoma dos valores dos vértices no caminho: %d\n", sum);
+    int sum = 0;
+    for (int i = 0; i <= pathIndex; i++) {
+        int row = path[i] / size;
+        int col = path[i] % size;
+        sum += matrix[row][col];
     }
+
+    if (sum > pathInfo->maxSum) {
+        pathInfo->maxSum = sum;
+        memcpy(pathInfo->bestPath, path, (pathIndex + 1) * sizeof(int));
+        pathInfo->bestPathSize = pathIndex + 1;
+    }
+
 
     Node* temp = graph->adjLists[v];
     while (temp) {
@@ -151,6 +157,28 @@ void findAllPaths(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) 
 
     free(visited);
     free(path);
+}
+
+//Função para encontrar o caminho com a maior soma 
+void findMaxPath(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    bool* visited = (bool*)calloc(graph->numVertices, sizeof(bool));
+    int* path = (int*)malloc(graph->numVertices * sizeof(int));
+    PathInfo pathInfo = { 0, malloc(graph->numVertices * sizeof(int)), 0 };
+
+    DFS(graph, 0, visited, path, 0, matrix, size, &pathInfo);
+
+    printf("Caminho com a maior soma e: ");
+    for (int i = 0; i < pathInfo.bestpathSize; i++) {
+        printf("%d", pathInfo.bestPath[i]);
+        if (i < pathInfo.bestpathSize - 1) printf("->");
+    }
+
+    printf("\n Maior soma dos valores: %d", pathInfo.maxSum);
+
+    free(visited);
+    free(path);
+    free(pathInfo.bestPath);
+
 }
 
 // Carrega a matriz do arquivo
