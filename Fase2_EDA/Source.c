@@ -19,24 +19,19 @@ typedef struct Graph {
     Node** adjLists; // Lista de adjacências
 } Graph;
 
-//Estrutura para acompanhar a soma maior e o caminho correspondente 
-typedef struct {
-    int maxSum;
-    int* bestPath;
-    int bestPathSize;
-} PathInfo;
-
-// Cria um novo nó
-Node* createNode(int v) {
+// Cria um novo nó para a lista de adjacências
+Node* createNode(int vertex) {
     Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->vertex = v;
+    if (!newNode) {
+        fprintf(stderr, "Erro ao alocar memória para o nó.\n");
+        exit(EXIT_FAILURE);
+    }
+    newNode->vertex = vertex;
     newNode->next = NULL;
     return newNode;
 }
 
-
-
-// Cria um novo grafo
+// Cria um novo grafo com um número especificado de vértices
 Graph* createGraph(int numVertices) {
     Graph* graph = (Graph*)malloc(sizeof(Graph));
     if (!graph) {
@@ -64,6 +59,8 @@ void addEdge(Graph* graph, int src, int dest) {
 
 // Remove uma aresta do grafo
 void removeEdge(Graph* graph, int src, int dest) {
+    if (!graph || !graph->adjLists) return;
+
     Node* current = graph->adjLists[src];
     Node* prev = NULL;
 
@@ -83,8 +80,10 @@ void removeEdge(Graph* graph, int src, int dest) {
     }
 }
 
-// Imprime o grafo
+// Imprime a lista de adjacências para cada vértice no grafo
 void printGraph(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    if (!graph || !graph->adjLists) return;
+
     for (int v = 0; v < graph->numVertices; ++v) {
         printf("\nLista de adjacências do vértice %d (Valor na matriz: %d):\n", v, matrix[v / size][v % size]);
         Node* temp = graph->adjLists[v];
@@ -96,108 +95,92 @@ void printGraph(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int si
     printf("\n");
 }
 
-// Liberta a memória alocada para o grafo
+// Liberta a memória alocada para o grafo e suas listas de adjacências
 void freeGraph(Graph* graph) {
-    if (!graph) return;
+    if (!graph || !graph->adjLists) return;
 
-    if (graph->adjLists) {
-        for (int i = 0; i < graph->numVertices; ++i) {
-            Node* current = graph->adjLists[i];
-            while (current) {
-                Node* temp = current;
-                current = current->next;
-                free(temp);
-            }
+    for (int i = 0; i < graph->numVertices; i++) {
+        Node* current = graph->adjLists[i];
+        while (current) {
+            Node* temp = current;
+            current = current->next;
+            free(temp);
         }
-        free(graph->adjLists);
     }
 
+    free(graph->adjLists);
     free(graph);
 }
 
-
-// Busca em Profundidade
-void DFS(Graph* graph, int v, bool* visited, int* path, int pathIndex, int currentSum, const int matrix[MAX_SIZE][MAX_SIZE], int size, PathInfo* pathInfo) {
+// Busca em profundidade (DFS) para encontrar o maior caminho com maior soma
+void DFS(Graph* graph, int v, bool* visited, int* currentPath, int currentPathIndex,
+    const int matrix[MAX_SIZE][MAX_SIZE], int size,
+    int* maxSum, int* bestPath, int* bestPathLength) {
     visited[v] = true;
-    path[pathIndex] = v;
-    currentSum += matrix[v / size][v % size];
+    currentPath[currentPathIndex] = v;
 
-    if (currentSum > pathInfo->maxSum) {
-        pathInfo->maxSum = currentSum;
-        memcpy(pathInfo->bestPath, path, (pathIndex + 1) * sizeof(int));
-        pathInfo->bestPathSize = pathIndex + 1;
+    // Se atingir o último vértice, calcula a soma do caminho
+    if (v == graph->numVertices - 1) {
+        int currentSum = 0;
+        printf("Caminho encontrado: ");
+        for (int i = 0; i <= currentPathIndex; i++) {
+            int row = currentPath[i] / size;
+            int col = currentPath[i] % size;
+            currentSum += matrix[row][col];
+            printf("%d ", currentPath[i]);
+            if (i < currentPathIndex) {
+                printf("-> ");
+            }
+        }
+        printf("\nSoma dos valores dos vértices no caminho: %d\n", currentSum);
+
+        // Atualiza o caminho com maior soma, se necessário
+        if (currentSum > *maxSum) {
+            *maxSum = currentSum;
+            *bestPathLength = currentPathIndex + 1;
+            for (int i = 0; i <= currentPathIndex; i++) {
+                bestPath[i] = currentPath[i];
+            }
+        }
     }
 
+    // Explora os vértices adjacentes
     Node* temp = graph->adjLists[v];
     while (temp) {
-        if (!visited[temp->vertex]) {
-            DFS(graph, temp->vertex, visited, path, pathIndex + 1, currentSum, matrix, size, pathInfo);
+        int adjVertex = temp->vertex;
+        if (!visited[adjVertex]) {
+            DFS(graph, adjVertex, visited, currentPath, currentPathIndex + 1,
+                matrix, size, maxSum, bestPath, bestPathLength);
         }
         temp = temp->next;
     }
+
+    // Desmarca o vértice para permitir outras buscas
     visited[v] = false;
 }
 
-
-
-void findMaxPath(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
-    // Inicializa o array de visitados e o caminho
-    bool* visited = calloc(graph->numVertices, sizeof(bool));
-    int* path = malloc(graph->numVertices * sizeof(int));
-
-    // Inicializa a estrutura PathInfo
-    PathInfo pathInfo;
-    pathInfo.maxSum = 0;
-    pathInfo.bestPath = malloc(graph->numVertices * sizeof(int));  // Alocar espaço para o melhor caminho
-    pathInfo.bestPathSize = 0;
-
-    // Iterar sobre todos os vértices, usando DFS para encontrar o caminho com a maior soma
-    for (int i = 0; i < graph->numVertices; i++) {
-        DFS(graph, i, visited, path, 0, 0, matrix, size, &pathInfo);
+// Função para imprimir o caminho com maior soma
+void printBestPath(int* path, int length, int maxSum) {
+    printf("\nMaior caminho encontrado: ");
+    for (int i = 0; i < length; i++) {
+        printf("%d", path[i]);
+        if (i < length - 1) {
+            printf(" -> ");
+        }
     }
-
-    // Imprimir o resultado
-    printf("Caminho com a maior soma é: ");
-    for (int i = 0; i < pathInfo.bestPathSize; i++) {
-        printf("%d ", pathInfo.bestPath[i]);
-        if (i < pathInfo.bestPathSize - 1) printf("-> ");
-    }
-    printf("\nMaior soma dos valores: %d\n", pathInfo.maxSum);
-
-    // Limpeza: liberar memória alocada
-    free(visited);
-    free(path);
-    free(pathInfo.bestPath);
+    printf("\nMaior soma: %d\n", maxSum);
 }
 
-
-
-// Função para encontrar todos os caminhos possíveis no grafo
-void findAllPaths(Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
-    bool* visited = calloc(graph->numVertices, sizeof(bool));
-    int* path = malloc(graph->numVertices * sizeof(int));
-    PathInfo pathInfo = { 0, malloc(graph->numVertices * sizeof(int)), 0 };
-
-    for (int i = 0; i < graph->numVertices; i++) {
-        DFS(graph, i, visited, path, 0, 0, matrix, size, &pathInfo);  // Inclui argumento para soma atual e PathInfo
-    }
-
-    // Opcional: Mostrar resultados ou limpeza adicional
-    free(visited);
-    free(path);
-    free(pathInfo.bestPath);
-}
-
-
-
-// Carrega a matriz do arquivo
-void loadMatrixFromFile(Graph* graph, const char* filename, int size, int matrix[MAX_SIZE][MAX_SIZE]) {
+// Carrega a matriz do arquivo e adiciona arestas ao grafo
+void loadMatrixFromFile(Graph* graph, const char* filename, int size,
+    int matrix[MAX_SIZE][MAX_SIZE]) {
     FILE* file = fopen(filename, "r");
     if (!file) {
         fprintf(stderr, "Erro ao abrir o arquivo %s.\n", filename);
         return;
     }
 
+    // Lê a matriz do arquivo
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             if (fscanf(file, "%d;", &matrix[i][j]) != 1) {
@@ -210,6 +193,7 @@ void loadMatrixFromFile(Graph* graph, const char* filename, int size, int matrix
 
     fclose(file);
 
+    // Adiciona arestas ao grafo com base na matriz
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             if (i < size - 1) { // Adiciona uma aresta para o elemento abaixo
@@ -223,35 +207,34 @@ void loadMatrixFromFile(Graph* graph, const char* filename, int size, int matrix
 }
 
 int main() {
-    int size = 5; // Tamanho da matriz
+    // Tamanho da matriz e grafo
+    int size = 5; // Pode ser ajustado conforme necessário
     int matrix[MAX_SIZE][MAX_SIZE];
 
-    // Preenche a matriz com valores de teste
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            matrix[i][j] = i * size + j; // Exemplo de preenchimento
-        }
-    }
+    Graph* graph = createGraph(size * size); // Cria um grafo com vértices do tamanho da matriz
 
-    // Cria um grafo baseado na matriz
-    Graph* graph = createGraph(size * size);
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            if (i < size - 1) { addEdge(graph, i * size + j, (i + 1) * size + j); }
-            if (j < size - 1) { addEdge(graph, i * size + j, i * size + j + 1); }
-        }
-    }
-
-    // Carrega a matriz do arquivo
+    // Carrega matriz do arquivo e adiciona arestas ao grafo
     loadMatrixFromFile(graph, "matrix.txt", size, matrix);
 
     // Imprime o grafo
     printGraph(graph, matrix, size);
 
-    // Encontra todos os caminhos possíveis
-    findAllPaths(graph, matrix, size);
+    int currentPath[MAX_SIZE];
+    int bestPath[MAX_SIZE];
+    int bestPathLength = 0;
+    int maxSum = 0;
 
-    // Liberta a memória
+    bool visited[MAX_SIZE] = { false }; // Inicializa array de visitados
+
+
+    // Realiza DFS para encontrar o caminho com maior soma
+    DFS(graph, 0, visited, currentPath, 0, matrix, size,
+        &maxSum, bestPath, &bestPathLength);
+
+    // Imprime o melhor caminho encontrado
+    printBestPath(bestPath, bestPathLength, maxSum);
+
+    // Liberta a memória alocada para o grafo
     freeGraph(graph);
 
     return 0;
