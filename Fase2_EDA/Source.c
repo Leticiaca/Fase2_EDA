@@ -59,6 +59,36 @@ void addEdge(Graph* graph, int src, int dest) {
     graph->adjLists[src] = newNode;
 }
 
+void loadAdjacenciesFromDotFile(Graph* graph, const char* filename) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Erro ao abrir o arquivo %s.\n", filename);
+        return;
+    }
+
+    // Ignorar as linhas até encontrar a linha "digraph G {"
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, "digraph G {")) {
+            break;
+        }
+    }
+
+    // Ler as arestas
+    while (fgets(line, sizeof(line), file)) {
+        int src, dest;
+        if (sscanf(line, " %d -> %d;", &src, &dest) == 2) {
+            // Adicionar a aresta ao grafo
+            addEdge(graph, src, dest);
+        }
+    }
+
+    fclose(file);
+}
+
+
+
+
 // Ponto 1.2 remover aresta do grafo
 void removeEdge(Graph* graph, int src, int dest) {
     if (!graph || !graph->adjLists) return;
@@ -82,20 +112,144 @@ void removeEdge(Graph* graph, int src, int dest) {
     }
 }
 
+void printVertices(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    for (int v = 0; v < graph->numVertices; ++v) {
+        int row = v / size;
+        int col = v % size;
+        if (matrix[row][col] != -1) { // Ignora vértices removidos
+            printf("Vértice %d (Valor na matriz: %d)\n", v, matrix[row][col]);
+        }
+    }
+}
+
+
+
+// Ponto 1.3 adicionar vertice ao grafo
+void addVertex(Graph* graph, int matrix[MAX_SIZE][MAX_SIZE], int* size, int value) {
+    // Verifica se a matriz já atingiu o tamanho máximo
+    if (*size >= MAX_SIZE) {
+        fprintf(stderr, "Erro: número máximo de vértices atingido.\n");
+        return;
+    }
+
+    // Adiciona o novo vértice
+    int newVertex = graph->numVertices;
+    graph->numVertices++;
+
+    graph->adjLists = (Node**)realloc(graph->adjLists, graph->numVertices * sizeof(Node*));
+    if (!graph->adjLists) {
+        fprintf(stderr, "Erro ao realocar memória para as listas de adjacências.\n");
+        exit(EXIT_FAILURE);
+    }
+    graph->adjLists[newVertex] = NULL;
+
+    // Atribui o valor do vértice à matriz
+    int row = newVertex / *size;
+    int col = newVertex % *size;
+    matrix[row][col] = value;
+}
+
+void removeVertex(Graph* graph, int vertex, int matrix[MAX_SIZE][MAX_SIZE], int size) {
+    if (vertex >= graph->numVertices) {
+        fprintf(stderr, "Erro: Vértice inválido.\n");
+        return;
+    }
+
+    // Remove todas as arestas que apontam para este vértice
+    for (int i = 0; i < graph->numVertices; i++) {
+        if (i != vertex) {
+            removeEdge(graph, i, vertex);
+        }
+    }
+
+    // Remove todas as arestas a partir deste vértice
+    Node* temp = graph->adjLists[vertex];
+    while (temp) {
+        Node* next = temp->next;
+        free(temp);
+        temp = next;
+    }
+    graph->adjLists[vertex] = NULL;
+
+    // Marca o valor na matriz como inválido
+    int row = vertex / size;
+    int col = vertex % size;
+    matrix[row][col] = -1; // Valor indicando que o vértice foi removido
+
+    printf("Vértice %d removido.\n", vertex);
+}
+
+
+
+
+
 // Ponto 2: Listagem de adjacentes
 void printGraph(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size) {
     if (!graph || !graph->adjLists) return;
 
     for (int v = 0; v < graph->numVertices; ++v) {
-        printf("\nLista de adjacências do vertice %d (Valor na matriz: %d):\n", v, matrix[v / size][v % size]);
+        int row = v / size;
+        int col = v % size;
+        if (matrix[row][col] == -1) { // Ignora vértices removidos
+            continue;
+        }
+
+        printf("\nLista de adjacências do vertice %d (Valor na matriz: %d):\n", v, matrix[row][col]);
         Node* temp = graph->adjLists[v];
         while (temp) {
-            printf("-> %d (Valor na matriz: %d)\n", temp->vertex, matrix[temp->vertex / size][temp->vertex % size]);
+            if (matrix[temp->vertex / size][temp->vertex % size] != -1) { // Ignora adjacências removidas
+                printf("-> %d (Valor na matriz: %d)\n", temp->vertex, matrix[temp->vertex / size][temp->vertex % size]);
+            }
             temp = temp->next;
         }
     }
     printf("\n");
 }
+
+
+
+
+void exportGraphToDot(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int size, const char* filename) {
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Erro ao abrir o arquivo %s para escrita.\n", filename);
+        return;
+    }
+
+    fprintf(file, "digraph G {\n");
+
+    // Escreve os vértices
+    for (int v = 0; v < graph->numVertices; ++v) {
+        int row = v / size;
+        int col = v % size;
+        if (matrix[row][col] != -1) { // Ignora vértices removidos
+            fprintf(file, "    %d [label=\"%d\"];\n", v, matrix[row][col]);
+        }
+    }
+
+    // Escreve as arestas
+    for (int v = 0; v < graph->numVertices; ++v) {
+        int row = v / size;
+        int col = v % size;
+        if (matrix[row][col] != -1) { // Ignora vértices removidos
+            Node* temp = graph->adjLists[v];
+            while (temp) {
+                int adjRow = temp->vertex / size;
+                int adjCol = temp->vertex % size;
+                if (matrix[adjRow][adjCol] != -1) { // Ignora adjacências removidas
+                    fprintf(file, "    %d -> %d;\n", v, temp->vertex);
+                }
+                temp = temp->next;
+            }
+        }
+    }
+
+    fprintf(file, "}\n");
+    fclose(file);
+    printf("Grafo exportado para %s com sucesso.\n", filename);
+}
+
+
 
 
 // Ponto 3: Carregamento de um grafo a partir de um ficheiro
@@ -119,19 +273,8 @@ void loadMatrixFromFile(Graph* graph, const char* filename, int size,
     }
 
     fclose(file);
-
-    // Adiciona arestas ao grafo com base na matriz
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            if (i < size - 1) { // Adiciona uma aresta para o elemento abaixo
-                addEdge(graph, i * size + j, (i + 1) * size + j);
-            }
-            if (j < size - 1) { // Adiciona uma aresta para o elemento à direita
-                addEdge(graph, i * size + j, i * size + j + 1);
-            }
-        }
-    }
 }
+
 
 
 // Ponto 4: Implementação de manipulação: procura em profundidade
@@ -217,11 +360,12 @@ void freeGraph(Graph* graph) {
 
 
 int main() {
-    int size = 5; // Pode ser ajustado conforme necessário
+    int size = 2; // Pode ser ajustado conforme necessário
     int matrix[MAX_SIZE][MAX_SIZE];
     Graph* graph = createGraph(size * size); // Cria um grafo com vértices do tamanho da matriz
 
     loadMatrixFromFile(graph, "matrix.txt", size, matrix);
+    loadAdjacenciesFromDotFile(graph, "grafo.dot");
 
     int option;
 
@@ -232,9 +376,12 @@ int main() {
         printf("3. Remover uma aresta do grafo\n");
         printf("4. Todos os caminhos possiveis\n");
         printf("5. Encontrar o melhor caminho com maior soma\n");
-        printf("6. Sair\n");
+        printf("6. Adicionar um novo vertice ao grafo\n");
+        printf("7. Remover um vertice do grafo\n");
+        printf("8. Exportar o grafo para grafo.dot\n");
+        printf("9. Mostrar os vertices\n");
+        printf("10. Sair\n");
         printf("Escolha uma opcao: ");
-
 
         if (scanf("%d", &option) != 1) {
             fprintf(stderr, "Entrada inválida.\n");
@@ -245,7 +392,6 @@ int main() {
         case 1:
             printGraph(graph, matrix, size);
             break;
-
         case 2:
             printf("Digite a origem da aresta: ");
             int src;
@@ -256,7 +402,6 @@ int main() {
             addEdge(graph, src, dest);
             printf("Aresta adicionada de %d para %d.\n", src, dest);
             break;
-
         case 3:
             printf("Digite a origem da aresta para remover: ");
             scanf("%d", &src);
@@ -265,34 +410,60 @@ int main() {
             removeEdge(graph, src, dest);
             printf("Aresta removida de %d para %d.\n", src, dest);
             break;
-
         case 4:
             printf("\nCaminhos possiveis a partir do primeiro vertice:\n");
-            bool visited[MAX_SIZE] = { false }; // Marca de vértices visitados
+            bool visited[MAX_SIZE] = { false };
             int currentPath[MAX_SIZE];
             int bestPath[MAX_SIZE];
             int currentPathIndex = 0;
-
-            DFS(graph, 0, visited, currentPath, currentPathIndex, matrix, size, NULL, NULL, NULL);
-            break;
-
-        case 5:
-        {
             int maxSum = 0;
             int bestPathLength = 0;
-            int bestPath[MAX_SIZE];
 
+            // Chamada para encontrar todos os caminhos possíveis
+            DFS(graph, 0, visited, currentPath, currentPathIndex, matrix, size, NULL, bestPath, &bestPathLength);
+            break;
+        case 5:
+            printf("\nEncontrar o melhor caminho com maior soma:\n");
+            // Reinicializa os vetores visited, currentPath e bestPath
+            memset(visited, false, sizeof(visited));
+            memset(currentPath, 0, sizeof(currentPath));
+            memset(bestPath, 0, sizeof(bestPath));
+            currentPathIndex = 0;
+            maxSum = 0;
+            bestPathLength = 0;
+
+            // Chamada para encontrar o melhor caminho com maior soma
             DFS(graph, 0, visited, currentPath, currentPathIndex, matrix, size, &maxSum, bestPath, &bestPathLength);
-
             printBestPath(bestPath, bestPathLength, maxSum);
             break;
-        }
-
         case 6:
+            printf("Digite o valor do novo vertice: ");
+            int value;
+            scanf("%d", &value);
+            addVertex(graph, matrix, &size, value);
+            printf("Novo vertice adicionado com valor %d. Total de vertices: %d\n", value, graph->numVertices);
+            break;
+        case 7:
+            printf("Vértices disponíveis:\n");
+            printVertices(graph, matrix, size);
+            printf("Digite o número do vértice que deseja remover: ");
+            int vertex;
+            scanf("%d", &vertex);
+            removeVertex(graph, vertex, matrix, size);
+            break;
+        case 8:
+            exportGraphToDot(graph, matrix, size, "grafo.dot");
+            break;
+        case 9:
+            printf("Vértices disponíveis:\n");
+            printVertices(graph, matrix, size);
+            break;
+        case 10:
             freeGraph(graph);
             printf("A sair...\n");
             exit(EXIT_SUCCESS);
             break;
+
 
         default:
             printf("Opção inválida. Escolha novamente.\n");
@@ -301,4 +472,11 @@ int main() {
     }
 
     return 0;
+
 }
+
+
+
+
+
+

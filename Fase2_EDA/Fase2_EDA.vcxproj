@@ -132,6 +132,9 @@
   <ItemGroup>
     <ClCompile Include="Source.c" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="grafo.dot" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
