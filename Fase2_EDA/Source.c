@@ -53,10 +53,33 @@ Graph* createGraph(int numVertices) {
 }
 
 // Ponto 1.1 adicionar aresta ao grafo
-void addEdge(Graph* graph, int src, int dest) {
+/*void addEdge(Graph* graph, int src, int dest) {
     Node* newNode = createNode(dest);
     newNode->next = graph->adjLists[src];
     graph->adjLists[src] = newNode;
+}*/
+
+void addEdgeAndSaveToDot(Graph* graph, int src, int dest, const char* filename) {
+    Node* newNode = createNode(dest);
+    newNode->next = graph->adjLists[src];
+    graph->adjLists[src] = newNode;
+
+    FILE* file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Erro ao abrir o arquivo %s", filename);
+        return;
+    }
+
+    fprintf(file, "digraph G {\n");
+    for (int v = 0; v < graph->numVertices; v++) {
+        Node* temp = graph->adjLists[v];
+        while (temp) {
+            fprintf(file, " %d -> %d;\n", v, temp->vertex);
+            temp = temp->next;
+        }
+    }
+    fprintf(file, "}\n");
+    fclose(file);
 }
 
 void loadAdjacenciesFromDotFile(Graph* graph, const char* filename) {
@@ -79,7 +102,7 @@ void loadAdjacenciesFromDotFile(Graph* graph, const char* filename) {
         int src, dest;
         if (sscanf(line, " %d -> %d;", &src, &dest) == 2) {
             // Adicionar a aresta ao grafo
-            addEdge(graph, src, dest);
+            addEdgeAndSaveToDot(graph, src, dest, "grafo.dot");
         }
     }
 
@@ -202,8 +225,9 @@ void printGraph(const Graph* graph, const int matrix[MAX_SIZE][MAX_SIZE], int si
             }
             temp = temp->next;
         }
+        printf("\n");
     }
-    printf("\n");
+    
 }
 
 
@@ -399,7 +423,7 @@ int main() {
             printf("Digite o destino da aresta: ");
             int dest;
             scanf("%d", &dest);
-            addEdge(graph, src, dest);
+            addEdgeAndSaveToDot(graph, src, dest, "grafo.dot");
             printf("Aresta adicionada de %d para %d.\n", src, dest);
             break;
         case 3:
